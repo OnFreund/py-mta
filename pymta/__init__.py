@@ -117,9 +117,7 @@ class SubwayFeed:
                     if arrival_time > now:
                         # Get trip headsign if available
                         destination = "Unknown"
-                        if trip.HasField("trip_headsign"):
-                            destination = trip.trip_headsign
-                        elif stop_time_update.HasField("stop_headsign"):
+                        if stop_time_update.HasField("stop_headsign"):
                             destination = stop_time_update.stop_headsign
 
                         arrivals.append(
