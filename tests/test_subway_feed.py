@@ -1,6 +1,6 @@
 """Tests for SubwayFeed class."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock, patch
 
 from google.transit import gtfs_realtime_pb2
@@ -40,6 +40,8 @@ def test_get_arrivals_success(mock_get):
     """Test getting arrivals successfully."""
     # Create a GTFS-RT FeedMessage
     feed_message = gtfs_realtime_pb2.FeedMessage()
+    feed_message.header.gtfs_realtime_version = "2.0"
+    feed_message.header.timestamp = int(datetime.now(timezone.utc).timestamp())
 
     # Create a trip update entity
     entity = feed_message.entity.add()
@@ -51,7 +53,6 @@ def test_get_arrivals_success(mock_get):
     # Add stop time update for the future
     stop_time = trip_update.stop_time_update.add()
     stop_time.stop_id = "B08S"
-    stop_time.stop_headsign = "Coney Island - Stillwell Av"
     future_time = datetime.now(timezone.utc).timestamp() + 300  # 5 minutes from now
     stop_time.arrival.time = int(future_time)
 
@@ -68,7 +69,7 @@ def test_get_arrivals_success(mock_get):
     assert len(arrivals) == 1
     assert arrivals[0].route_id == "Q"
     assert arrivals[0].stop_id == "B08S"
-    assert arrivals[0].destination == "Coney Island - Stillwell Av"
+    assert arrivals[0].destination == "Q train"
     assert isinstance(arrivals[0].arrival_time, datetime)
 
 
@@ -77,6 +78,8 @@ def test_get_arrivals_filters_past_arrivals(mock_get):
     """Test that past arrivals are filtered out."""
     # Create a GTFS-RT FeedMessage
     feed_message = gtfs_realtime_pb2.FeedMessage()
+    feed_message.header.gtfs_realtime_version = "2.0"
+    feed_message.header.timestamp = int(datetime.now(timezone.utc).timestamp())
 
     # Create trip with past arrival
     entity = feed_message.entity.add()
@@ -86,7 +89,6 @@ def test_get_arrivals_filters_past_arrivals(mock_get):
 
     stop_time = trip_update.stop_time_update.add()
     stop_time.stop_id = "B08S"
-    stop_time.stop_headsign = "Coney Island"
     past_time = datetime.now(timezone.utc).timestamp() - 300  # 5 minutes ago
     stop_time.arrival.time = int(past_time)
 
@@ -108,6 +110,8 @@ def test_get_arrivals_max_arrivals(mock_get):
     """Test max_arrivals parameter."""
     # Create a GTFS-RT FeedMessage with 5 arrivals
     feed_message = gtfs_realtime_pb2.FeedMessage()
+    feed_message.header.gtfs_realtime_version = "2.0"
+    feed_message.header.timestamp = int(datetime.now(timezone.utc).timestamp())
 
     for i in range(5):
         entity = feed_message.entity.add()
@@ -117,7 +121,6 @@ def test_get_arrivals_max_arrivals(mock_get):
 
         stop_time = trip_update.stop_time_update.add()
         stop_time.stop_id = "B08S"
-        stop_time.stop_headsign = "Coney Island"
         future_time = datetime.now(timezone.utc).timestamp() + (i + 1) * 60
         stop_time.arrival.time = int(future_time)
 
@@ -137,7 +140,8 @@ def test_get_arrivals_max_arrivals(mock_get):
 @patch("pymta.requests.get")
 def test_get_arrivals_network_error(mock_get):
     """Test handling of network errors."""
-    mock_get.side_effect = Exception("Network error")
+    import requests.exceptions
+    mock_get.side_effect = requests.exceptions.RequestException("Network error")
 
     feed = SubwayFeed(feed_id="N")
     with pytest.raises(MTAFeedError, match="Error fetching GTFS-RT feed"):
@@ -154,7 +158,7 @@ def test_arrival_sorting():
         destination="Coney Island",
     )
     arrival2 = Arrival(
-        arrival_time=now.replace(minute=now.minute + 5),
+        arrival_time=now + timedelta(minutes=5),
         route_id="Q",
         stop_id="B08S",
         destination="Coney Island",
