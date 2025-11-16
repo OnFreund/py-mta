@@ -9,7 +9,7 @@ import requests
 from .constants import FEED_URLS, LINE_TO_FEED
 from .models import Arrival
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __all__ = ["SubwayFeed", "Arrival", "MTAError", "MTAFeedError"]
 
 
@@ -115,10 +115,9 @@ class SubwayFeed:
 
                     # Only include future arrivals
                     if arrival_time > now:
-                        # Get trip headsign if available
-                        destination = "Unknown"
-                        if stop_time_update.HasField("stop_headsign"):
-                            destination = stop_time_update.stop_headsign
+                        # Use route_id as destination for now
+                        # (headsign fields don't exist in standard GTFS-RT)
+                        destination = f"{trip.route_id} train"
 
                         arrivals.append(
                             Arrival(
