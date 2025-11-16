@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "py-mta"
+name = "py-nymta"
 version = "0.1.0"
 description = "Python library for accessing MTA (Metropolitan Transportation Authority) real-time transit data for NYC"
 readme = "README.md"
 authors = [
-    {name = "py-mta Contributors"}
+    {name = "py-nymta Contributors"}
 ]
 license = {text = "MIT"}
 classifiers = [
@@ -27,8 +27,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/OnFreund/py-mta"
-Issues = "https://github.com/OnFreund/py-mta/issues"
+Homepage = "https://github.com/OnFreund/py-nymta"
+Issues = "https://github.com/OnFreund/py-nymta/issues"
 
 [tool.setuptools.packages.find]
 include = ["pymta*"]
