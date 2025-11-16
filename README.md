@@ -1,6 +1,6 @@
-# mta-gtfs-rt
+# PyMTA
 
-Python library for accessing MTA GTFS-RT (General Transit Feed Specification - Realtime) feeds for NYC transit.
+Python library for accessing MTA (Metropolitan Transportation Authority) real-time transit data for NYC.
 
 ## Features
 
@@ -13,7 +13,7 @@ Python library for accessing MTA GTFS-RT (General Transit Feed Specification - R
 ## Installation
 
 ```bash
-pip install mta-gtfs-rt
+pip install pymta
 ```
 
 ## Usage
@@ -21,7 +21,7 @@ pip install mta-gtfs-rt
 ### Basic Example
 
 ```python
-from mta_gtfs_rt import SubwayFeed
+from pymta import SubwayFeed
 
 # Create a feed for the N/Q/R/W lines
 feed = SubwayFeed(feed_id="N")
@@ -38,7 +38,7 @@ for arrival in arrivals:
 ### Finding the Feed ID for a Route
 
 ```python
-from mta_gtfs_rt import SubwayFeed
+from pymta import SubwayFeed
 
 # Get the feed ID for a specific route
 feed_id = SubwayFeed.get_feed_id_for_route("Q")
@@ -51,7 +51,7 @@ feed = SubwayFeed(feed_id=feed_id)
 ### Custom Timeout and Max Arrivals
 
 ```python
-from mta_gtfs_rt import SubwayFeed
+from pymta import SubwayFeed
 
 # Create a feed with custom timeout
 feed = SubwayFeed(feed_id="1", timeout=60)
@@ -67,7 +67,7 @@ arrivals = feed.get_arrivals(
 ### Error Handling
 
 ```python
-from mta_gtfs_rt import SubwayFeed, MTAFeedError
+from pymta import SubwayFeed, MTAFeedError
 
 feed = SubwayFeed(feed_id="A")
 
@@ -172,8 +172,8 @@ Dataclass representing a single train arrival.
 ### Setup
 
 ```bash
-git clone https://github.com/OnFreund/mta-gtfs-rt.git
-cd mta-gtfs-rt
+git clone https://github.com/OnFreund/pymta.git
+cd pymta
 pip install -e .
 ```
 

@@ -1,4 +1,4 @@
-"""MTA GTFS-RT library for accessing NYC transit real-time data."""
+"""PyMTA library for accessing NYC transit real-time data."""
 
 from datetime import datetime, timezone
 
@@ -14,7 +14,7 @@ __all__ = ["SubwayFeed", "Arrival", "MTAError", "MTAFeedError"]
 
 
 class MTAError(Exception):
-    """Base exception for MTA GTFS-RT library."""
+    """Base exception for PyMTA library."""
 
 
 class MTAFeedError(MTAError):
@@ -22,7 +22,7 @@ class MTAFeedError(MTAError):
 
 
 class SubwayFeed:
-    """Interface for MTA subway GTFS-RT feeds."""
+    """Interface for MTA subway real-time feeds."""
 
     def __init__(self, feed_id: str, timeout: int = 30) -> None:
         """Initialize the subway feed.

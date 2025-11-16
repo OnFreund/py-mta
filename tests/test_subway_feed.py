@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 from google.transit import gtfs_realtime_pb2
 import pytest
 
-from mta_gtfs_rt import Arrival, MTAFeedError, SubwayFeed
+from pymta import Arrival, MTAFeedError, SubwayFeed
 
 
 def test_init_valid_feed_id():
@@ -35,7 +35,7 @@ def test_get_feed_id_for_invalid_route():
         SubwayFeed.get_feed_id_for_route("INVALID")
 
 
-@patch("mta_gtfs_rt.requests.get")
+@patch("pymta.requests.get")
 def test_get_arrivals_success(mock_get):
     """Test getting arrivals successfully."""
     # Create a GTFS-RT FeedMessage
@@ -72,7 +72,7 @@ def test_get_arrivals_success(mock_get):
     assert isinstance(arrivals[0].arrival_time, datetime)
 
 
-@patch("mta_gtfs_rt.requests.get")
+@patch("pymta.requests.get")
 def test_get_arrivals_filters_past_arrivals(mock_get):
     """Test that past arrivals are filtered out."""
     # Create a GTFS-RT FeedMessage
@@ -103,7 +103,7 @@ def test_get_arrivals_filters_past_arrivals(mock_get):
     assert len(arrivals) == 0
 
 
-@patch("mta_gtfs_rt.requests.get")
+@patch("pymta.requests.get")
 def test_get_arrivals_max_arrivals(mock_get):
     """Test max_arrivals parameter."""
     # Create a GTFS-RT FeedMessage with 5 arrivals
@@ -134,7 +134,7 @@ def test_get_arrivals_max_arrivals(mock_get):
     assert len(arrivals) == 3
 
 
-@patch("mta_gtfs_rt.requests.get")
+@patch("pymta.requests.get")
 def test_get_arrivals_network_error(mock_get):
     """Test handling of network errors."""
     mock_get.side_effect = Exception("Network error")

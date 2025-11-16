@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mta-gtfs-rt"
+name = "pymta"
 version = "0.1.0"
-description = "Python library for accessing MTA GTFS-RT feeds for NYC transit"
+description = "Python library for accessing MTA (Metropolitan Transportation Authority) real-time transit data for NYC"
 readme = "README.md"
 authors = [
-    {name = "MTA GTFS-RT Contributors"}
+    {name = "PyMTA Contributors"}
 ]
 license = {text = "MIT"}
 classifiers = [
@@ -27,9 +27,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/OnFreund/mta-gtfs-rt"
-Issues = "https://github.com/OnFreund/mta-gtfs-rt/issues"
+Homepage = "https://github.com/OnFreund/pymta"
+Issues = "https://github.com/OnFreund/pymta/issues"
 
 [tool.setuptools.packages.find]
-include = ["mta_gtfs_rt*"]
+include = ["pymta*"]
 exclude = ["tests*"]
