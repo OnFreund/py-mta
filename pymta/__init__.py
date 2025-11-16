@@ -1,4 +1,4 @@
-"""PyMTA library for accessing NYC transit real-time data."""
+"""py-mta library for accessing NYC transit real-time data."""
 
 from datetime import datetime, timezone
 
@@ -14,7 +14,7 @@ __all__ = ["SubwayFeed", "Arrival", "MTAError", "MTAFeedError"]
 
 
 class MTAError(Exception):
-    """Base exception for PyMTA library."""
+    """Base exception for py-mta library."""
 
 
 class MTAFeedError(MTAError):

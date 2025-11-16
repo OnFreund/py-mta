@@ -1,4 +1,4 @@
-# PyMTA
+# py-mta
 
 Python library for accessing MTA (Metropolitan Transportation Authority) real-time transit data for NYC.
 
@@ -13,7 +13,7 @@ Python library for accessing MTA (Metropolitan Transportation Authority) real-ti
 ## Installation
 
 ```bash
-pip install pymta
+pip install py-mta
 ```
 
 ## Usage
@@ -172,8 +172,8 @@ Dataclass representing a single train arrival.
 ### Setup
 
 ```bash
-git clone https://github.com/OnFreund/pymta.git
-cd pymta
+git clone https://github.com/OnFreund/py-mta.git
+cd py-mta
 pip install -e .
 ```
 
