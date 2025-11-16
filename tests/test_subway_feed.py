@@ -47,11 +47,11 @@ def test_get_arrivals_success(mock_get):
 
     trip_update = entity.trip_update
     trip_update.trip.route_id = "Q"
-    trip_update.trip.trip_headsign = "Coney Island - Stillwell Av"
 
     # Add stop time update for the future
     stop_time = trip_update.stop_time_update.add()
     stop_time.stop_id = "B08S"
+    stop_time.stop_headsign = "Coney Island - Stillwell Av"
     future_time = datetime.now(timezone.utc).timestamp() + 300  # 5 minutes from now
     stop_time.arrival.time = int(future_time)
 
@@ -83,10 +83,10 @@ def test_get_arrivals_filters_past_arrivals(mock_get):
     entity.id = "trip1"
     trip_update = entity.trip_update
     trip_update.trip.route_id = "Q"
-    trip_update.trip.trip_headsign = "Coney Island"
 
     stop_time = trip_update.stop_time_update.add()
     stop_time.stop_id = "B08S"
+    stop_time.stop_headsign = "Coney Island"
     past_time = datetime.now(timezone.utc).timestamp() - 300  # 5 minutes ago
     stop_time.arrival.time = int(past_time)
 
@@ -114,10 +114,10 @@ def test_get_arrivals_max_arrivals(mock_get):
         entity.id = f"trip{i}"
         trip_update = entity.trip_update
         trip_update.trip.route_id = "Q"
-        trip_update.trip.trip_headsign = "Coney Island"
 
         stop_time = trip_update.stop_time_update.add()
         stop_time.stop_id = "B08S"
+        stop_time.stop_headsign = "Coney Island"
         future_time = datetime.now(timezone.utc).timestamp() + (i + 1) * 60
         stop_time.arrival.time = int(future_time)
 
