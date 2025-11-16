@@ -9,7 +9,7 @@ import requests
 from .constants import FEED_URLS, LINE_TO_FEED
 from .models import Arrival
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __all__ = ["SubwayFeed", "Arrival", "MTAError", "MTAFeedError"]
 
 
