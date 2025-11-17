@@ -84,6 +84,39 @@ async def main():
 asyncio.run(main())
 ```
 
+### Discovering Active Stops for a Route
+
+Both `SubwayFeed` and `BusFeed` support discovering which stops are currently active (have scheduled arrivals) for a route:
+
+```python
+import asyncio
+from pymta import SubwayFeed, BusFeed
+
+async def main():
+    # Get active subway stops for the Q train
+    async with SubwayFeed(feed_id="N") as feed:
+        stops = await feed.get_active_stops(route_id="Q")
+
+        print("Active Q train stops:")
+        for stop in stops:
+            status = "has arrivals" if stop["has_arrivals"] else "no arrivals"
+            print(f"  {stop['stop_id']}: {status}")
+
+    # Get active bus stops for the M15
+    api_key = "YOUR_MTA_BUS_TIME_API_KEY"
+    async with BusFeed(api_key=api_key) as feed:
+        stops = await feed.get_active_stops(route_id="M15")
+
+        print("\nActive M15 bus stops:")
+        for stop in stops:
+            status = "has arrivals" if stop["has_arrivals"] else "no arrivals"
+            print(f"  {stop['stop_id']}: {status}")
+
+asyncio.run(main())
+```
+
+**Note**: This returns stops from the real-time feed (currently active). For a complete list of all stops on a route, you would need to use the static GTFS data.
+
 ### Finding the Feed ID for a Route
 
 ```python
@@ -239,6 +272,22 @@ Get upcoming train arrivals for a specific route and stop.
 **Raises:**
 - `MTAFeedError`: If feed cannot be fetched or parsed
 
+#### `async get_active_stops(route_id: str) -> list[dict]`
+
+Get all active stops for a subway route from the real-time feed.
+
+**Parameters:**
+- `route_id`: The route/line ID (e.g., '1', 'A', 'Q')
+
+**Returns:**
+- List of dictionaries containing:
+  - `stop_id`: The stop ID (includes direction suffix like N/S)
+  - `stop_name`: Stop name if available (typically None in real-time feeds)
+  - `has_arrivals`: Whether there are currently arrivals at this stop
+
+**Raises:**
+- `MTAFeedError`: If feed cannot be fetched or parsed
+
 #### `async close()`
 
 Close the owned session if it exists. Only needed if not using the async context manager.
@@ -312,6 +361,22 @@ Get current vehicle positions for buses.
   - `longitude`: Current longitude
   - `bearing`: Current bearing (0-359 degrees, or None)
   - `timestamp`: Last update timestamp (datetime object)
+
+**Raises:**
+- `MTAFeedError`: If feed cannot be fetched or parsed
+
+#### `async get_active_stops(route_id: str) -> list[dict]`
+
+Get all active stops for a bus route from the real-time feed.
+
+**Parameters:**
+- `route_id`: The bus route ID (e.g., 'M15', 'B46', 'Q10')
+
+**Returns:**
+- List of dictionaries containing:
+  - `stop_id`: The stop ID
+  - `stop_name`: Stop name if available (typically None in real-time feeds)
+  - `has_arrivals`: Whether there are currently arrivals at this stop
 
 **Raises:**
 - `MTAFeedError`: If feed cannot be fetched or parsed

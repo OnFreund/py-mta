@@ -191,3 +191,60 @@ def test_arrival_sorting():
 
     assert arrivals[0] == arrival1
     assert arrivals[1] == arrival2
+
+
+@pytest.mark.asyncio
+async def test_get_active_stops():
+    """Test getting active stops for a route."""
+    # Create a GTFS-RT FeedMessage with multiple stops
+    feed_message = gtfs_realtime_pb2.FeedMessage()
+    feed_message.header.gtfs_realtime_version = "2.0"
+    feed_message.header.timestamp = int(datetime.now(timezone.utc).timestamp())
+
+    # Add trip with multiple stops
+    entity = feed_message.entity.add()
+    entity.id = "trip1"
+    trip_update = entity.trip_update
+    trip_update.trip.route_id = "Q"
+
+    # Stop 1 - with future arrival
+    stop_time1 = trip_update.stop_time_update.add()
+    stop_time1.stop_id = "B08N"
+    stop_time1.arrival.time = int(datetime.now(timezone.utc).timestamp() + 300)
+
+    # Stop 2 - with future arrival
+    stop_time2 = trip_update.stop_time_update.add()
+    stop_time2.stop_id = "B08S"
+    stop_time2.arrival.time = int(datetime.now(timezone.utc).timestamp() + 600)
+
+    # Add another trip with a different stop
+    entity2 = feed_message.entity.add()
+    entity2.id = "trip2"
+    trip_update2 = entity2.trip_update
+    trip_update2.trip.route_id = "Q"
+
+    stop_time3 = trip_update2.stop_time_update.add()
+    stop_time3.stop_id = "D20N"
+    stop_time3.arrival.time = int(datetime.now(timezone.utc).timestamp() + 900)
+
+    # Mock response
+    mock_response = AsyncMock()
+    mock_response.read = AsyncMock(return_value=feed_message.SerializeToString())
+    mock_response.raise_for_status = Mock()
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=None)
+
+    # Mock session
+    mock_session = Mock()
+    mock_session.get = Mock(return_value=mock_response)
+
+    # Test
+    feed = SubwayFeed(feed_id="N", session=mock_session)
+    stops = await feed.get_active_stops(route_id="Q")
+
+    assert len(stops) == 3
+    assert stops[0]["stop_id"] == "B08N"
+    assert stops[1]["stop_id"] == "B08S"
+    assert stops[2]["stop_id"] == "D20N"
+    assert all(stop["has_arrivals"] for stop in stops)
+    assert all(stop["stop_name"] is None for stop in stops)

@@ -166,6 +166,87 @@ class SubwayFeed:
         arrivals.sort()
         return arrivals[:max_arrivals]
 
+    async def get_active_stops(
+        self,
+        route_id: str,
+    ) -> list[dict]:
+        """Get all active stops for a subway route from the real-time feed.
+
+        Args:
+            route_id: The route/line ID (e.g., '1', 'A', 'Q').
+
+        Returns:
+            List of dictionaries containing stop information:
+                - stop_id: The stop ID (includes direction suffix like N/S)
+                - stop_name: Stop name if available (may be None)
+                - has_arrivals: Whether there are currently arrivals at this stop
+
+        Raises:
+            MTAFeedError: If feed cannot be fetched or parsed.
+        """
+        # Get or create session
+        session = self._session or self._owned_session
+        if session is None:
+            session = aiohttp.ClientSession()
+            self._owned_session = session
+
+        # Fetch the GTFS-RT feed
+        try:
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
+            async with session.get(self.feed_url, timeout=timeout) as response:
+                response.raise_for_status()
+                content = await response.read()
+        except aiohttp.ClientError as err:
+            raise MTAFeedError(f"Error fetching GTFS-RT feed: {err}") from err
+        except TimeoutError as err:
+            raise MTAFeedError(f"Timeout fetching GTFS-RT feed: {err}") from err
+
+        # Parse the protobuf
+        feed = gtfs_realtime_pb2.FeedMessage()
+        try:
+            feed.ParseFromString(content)
+        except DecodeError as err:
+            raise MTAFeedError(f"Error parsing GTFS-RT feed: {err}") from err
+
+        # Collect unique stops
+        stops_dict = {}
+        now = datetime.now(timezone.utc)
+
+        # Process each entity in the feed
+        for entity in feed.entity:
+            if not entity.HasField("trip_update"):
+                continue
+
+            trip_update = entity.trip_update
+            trip = trip_update.trip
+
+            # Filter by route/line
+            if trip.route_id != route_id:
+                continue
+
+            # Process stop time updates
+            for stop_time_update in trip_update.stop_time_update:
+                stop_id = stop_time_update.stop_id
+
+                if stop_id and stop_id not in stops_dict:
+                    # Check if there are future arrivals at this stop
+                    has_arrivals = False
+                    if stop_time_update.HasField("arrival"):
+                        arrival_time = datetime.fromtimestamp(
+                            stop_time_update.arrival.time, tz=timezone.utc
+                        )
+                        has_arrivals = arrival_time > now
+
+                    stops_dict[stop_id] = {
+                        "stop_id": stop_id,
+                        "stop_name": None,  # Real-time feed doesn't include stop names
+                        "has_arrivals": has_arrivals,
+                    }
+
+        # Convert to sorted list
+        stops = sorted(stops_dict.values(), key=lambda x: x["stop_id"])
+        return stops
+
     @staticmethod
     def get_feed_id_for_route(route_id: str) -> str:
         """Get the feed ID for a given route.
@@ -322,6 +403,92 @@ class BusFeed:
         # Sort by arrival time and limit to max_arrivals
         arrivals.sort()
         return arrivals[:max_arrivals]
+
+    async def get_active_stops(
+        self,
+        route_id: str,
+    ) -> list[dict]:
+        """Get all active stops for a bus route from the real-time feed.
+
+        Args:
+            route_id: The bus route ID (e.g., 'M15', 'B46', 'Q10').
+
+        Returns:
+            List of dictionaries containing stop information:
+                - stop_id: The stop ID
+                - stop_name: Stop name if available (may be None)
+                - has_arrivals: Whether there are currently arrivals at this stop
+
+        Raises:
+            MTAFeedError: If feed cannot be fetched or parsed.
+        """
+        # Get or create session
+        session = self._session or self._owned_session
+        if session is None:
+            session = aiohttp.ClientSession()
+            self._owned_session = session
+
+        # Fetch the GTFS-RT trip updates feed
+        feed_url = BUS_FEED_URLS["trip_updates"]
+        params = {"key": self.api_key}
+
+        try:
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
+            async with session.get(
+                feed_url, params=params, timeout=timeout
+            ) as response:
+                response.raise_for_status()
+                content = await response.read()
+        except aiohttp.ClientError as err:
+            raise MTAFeedError(f"Error fetching GTFS-RT feed: {err}") from err
+        except TimeoutError as err:
+            raise MTAFeedError(f"Timeout fetching GTFS-RT feed: {err}") from err
+
+        # Parse the protobuf
+        feed = gtfs_realtime_pb2.FeedMessage()
+        try:
+            feed.ParseFromString(content)
+        except DecodeError as err:
+            raise MTAFeedError(f"Error parsing GTFS-RT feed: {err}") from err
+
+        # Collect unique stops
+        stops_dict = {}
+        now = datetime.now(timezone.utc)
+
+        # Process each entity in the feed
+        for entity in feed.entity:
+            if not entity.HasField("trip_update"):
+                continue
+
+            trip_update = entity.trip_update
+            trip = trip_update.trip
+
+            # Filter by route
+            if trip.route_id != route_id:
+                continue
+
+            # Process stop time updates
+            for stop_time_update in trip_update.stop_time_update:
+                stop_id = stop_time_update.stop_id
+
+                if stop_id and stop_id not in stops_dict:
+                    # Check if there are future arrivals at this stop
+                    has_arrivals = False
+                    if stop_time_update.HasField("arrival"):
+                        arrival_time = datetime.fromtimestamp(
+                            stop_time_update.arrival.time, tz=timezone.utc
+                        )
+                        has_arrivals = arrival_time > now
+
+                    stops_dict[stop_id] = {
+                        "stop_id": stop_id,
+                        "stop_name": None,  # Real-time feed doesn't include stop names
+                        "has_arrivals": has_arrivals,
+                    }
+
+        # Convert to sorted list
+        stops = sorted(stops_dict.values(), key=lambda x: x["stop_id"])
+        return stops
 
     async def get_vehicle_positions(
         self,
