@@ -7,8 +7,9 @@ import aiohttp
 from google.protobuf.message import DecodeError
 from google.transit import gtfs_realtime_pb2
 
-from .constants import FEED_URLS, LINE_TO_FEED, BUS_FEED_URLS
+from .constants import FEED_URLS, LINE_TO_FEED, BUS_FEED_URLS, STATIC_GTFS_URLS
 from .models import Arrival
+from .gtfs_static import GTFSCache
 
 __version__ = "0.3.0"
 __all__ = ["SubwayFeed", "BusFeed", "Arrival", "MTAError", "MTAFeedError"]
@@ -30,6 +31,7 @@ class SubwayFeed:
         feed_id: str,
         timeout: int = 30,
         session: Optional[aiohttp.ClientSession] = None,
+        gtfs_cache: Optional[GTFSCache] = None,
     ) -> None:
         """Initialize the subway feed.
 
@@ -38,6 +40,7 @@ class SubwayFeed:
             timeout: Request timeout in seconds (default: 30).
             session: Optional aiohttp ClientSession. If not provided, a new session
                 will be created for each request.
+            gtfs_cache: Optional GTFSCache instance. If not provided, a new cache will be created.
 
         Raises:
             ValueError: If feed_id is not valid.
@@ -53,6 +56,7 @@ class SubwayFeed:
         self.timeout = timeout
         self._session = session
         self._owned_session: Optional[aiohttp.ClientSession] = None
+        self._gtfs_cache = gtfs_cache or GTFSCache()
 
     async def __aenter__(self) -> "SubwayFeed":
         """Async context manager entry."""
@@ -166,6 +170,47 @@ class SubwayFeed:
         arrivals.sort()
         return arrivals[:max_arrivals]
 
+    async def get_stops(
+        self,
+        route_id: str,
+    ) -> list[dict]:
+        """Get all stops for a subway route from static GTFS data.
+
+        Args:
+            route_id: The route/line ID (e.g., '1', 'A', 'Q').
+
+        Returns:
+            List of dictionaries containing stop information:
+                - stop_id: The stop ID
+                - stop_name: Stop name
+                - stop_sequence: Order of stop on the route
+
+        Raises:
+            MTAFeedError: If GTFS data cannot be fetched or parsed.
+        """
+        # Get or create session
+        session = self._session or self._owned_session
+        if session is None:
+            session = aiohttp.ClientSession()
+            self._owned_session = session
+
+        try:
+            # Download/cache the static GTFS feed
+            gtfs_url = STATIC_GTFS_URLS["subway"]
+            zip_path = await self._gtfs_cache.download_gtfs(
+                url=gtfs_url,
+                feed_name="subway",
+                session=session,
+                timeout=self.timeout,
+            )
+
+            # Parse stops for this route
+            stops = self._gtfs_cache.parse_stops_for_route(zip_path, route_id)
+            return stops
+
+        except Exception as err:
+            raise MTAFeedError(f"Error fetching static GTFS data: {err}") from err
+
     async def get_active_stops(
         self,
         route_id: str,
@@ -276,6 +321,7 @@ class BusFeed:
         api_key: str,
         timeout: int = 30,
         session: Optional[aiohttp.ClientSession] = None,
+        gtfs_cache: Optional[GTFSCache] = None,
     ) -> None:
         """Initialize the bus feed.
 
@@ -284,6 +330,7 @@ class BusFeed:
             timeout: Request timeout in seconds (default: 30).
             session: Optional aiohttp ClientSession. If not provided, a new session
                 will be created for each request.
+            gtfs_cache: Optional GTFSCache instance. If not provided, a new cache will be created.
         """
         if not api_key:
             raise ValueError("API key is required for bus feeds")
@@ -292,6 +339,7 @@ class BusFeed:
         self.timeout = timeout
         self._session = session
         self._owned_session: Optional[aiohttp.ClientSession] = None
+        self._gtfs_cache = gtfs_cache or GTFSCache()
 
     async def __aenter__(self) -> "BusFeed":
         """Async context manager entry."""
@@ -403,6 +451,62 @@ class BusFeed:
         # Sort by arrival time and limit to max_arrivals
         arrivals.sort()
         return arrivals[:max_arrivals]
+
+    async def get_stops(
+        self,
+        route_id: str,
+    ) -> list[dict]:
+        """Get all stops for a bus route from static GTFS data.
+
+        Args:
+            route_id: The bus route ID (e.g., 'M15', 'B46', 'Q10').
+
+        Returns:
+            List of dictionaries containing stop information:
+                - stop_id: The stop ID
+                - stop_name: Stop name
+                - stop_sequence: Order of stop on the route
+
+        Raises:
+            MTAFeedError: If GTFS data cannot be fetched or parsed, or route not found.
+        """
+        # Get or create session
+        session = self._session or self._owned_session
+        if session is None:
+            session = aiohttp.ClientSession()
+            self._owned_session = session
+
+        try:
+            # Search all borough feeds for the route
+            borough_feeds = [
+                ("bus_bronx", STATIC_GTFS_URLS["bus_bronx"]),
+                ("bus_brooklyn", STATIC_GTFS_URLS["bus_brooklyn"]),
+                ("bus_manhattan", STATIC_GTFS_URLS["bus_manhattan"]),
+                ("bus_queens", STATIC_GTFS_URLS["bus_queens"]),
+                ("bus_staten_island", STATIC_GTFS_URLS["bus_staten_island"]),
+            ]
+
+            for feed_name, gtfs_url in borough_feeds:
+                # Download/cache the static GTFS feed
+                zip_path = await self._gtfs_cache.download_gtfs(
+                    url=gtfs_url,
+                    feed_name=feed_name,
+                    session=session,
+                    timeout=self.timeout,
+                )
+
+                # Try to parse stops for this route
+                stops = self._gtfs_cache.parse_stops_for_route(zip_path, route_id)
+                if stops:
+                    return stops
+
+            # Route not found in any borough feed
+            raise MTAFeedError(f"Route {route_id} not found in any borough GTFS feed")
+
+        except MTAFeedError:
+            raise
+        except Exception as err:
+            raise MTAFeedError(f"Error fetching static GTFS data: {err}") from err
 
     async def get_active_stops(
         self,

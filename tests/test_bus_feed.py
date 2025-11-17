@@ -403,3 +403,46 @@ async def test_context_manager():
         assert feed.api_key == "test_key"
     # Ensure close() was called
     assert feed._owned_session is None
+
+
+@pytest.mark.asyncio
+async def test_get_stops():
+    """Test getting static stops for a route."""
+    from pathlib import Path
+    from pymta.gtfs_static import GTFSCache
+
+    # Mock GTFSCache
+    mock_cache = Mock(spec=GTFSCache)
+    mock_cache.download_gtfs = AsyncMock(return_value=Path("/fake/path.zip"))
+
+    # Simulate searching through borough feeds - return empty for first two, then results for manhattan
+    mock_cache.parse_stops_for_route = Mock(side_effect=[
+        [],  # bronx - no results
+        [],  # brooklyn - no results
+        [    # manhattan - found!
+            {"stop_id": "400561", "stop_name": "1 Av/E 79 St", "stop_sequence": 1},
+            {"stop_id": "400562", "stop_name": "1 Av/E 72 St", "stop_sequence": 2},
+            {"stop_id": "400563", "stop_name": "1 Av/E 67 St", "stop_sequence": 3},
+        ],
+    ])
+
+    # Mock session
+    mock_session = Mock()
+
+    # Test
+    feed = BusFeed(api_key="test_key", session=mock_session, gtfs_cache=mock_cache)
+    stops = await feed.get_stops(route_id="M15")
+
+    assert len(stops) == 3
+    assert stops[0]["stop_id"] == "400561"
+    assert stops[0]["stop_name"] == "1 Av/E 79 St"
+    assert stops[0]["stop_sequence"] == 1
+    assert stops[1]["stop_id"] == "400562"
+    assert stops[1]["stop_name"] == "1 Av/E 72 St"
+    assert stops[2]["stop_id"] == "400563"
+    assert stops[2]["stop_name"] == "1 Av/E 67 St"
+
+    # Verify cache was called - should have called download 3 times (bronx, brooklyn, manhattan)
+    # and stopped when it found results in manhattan
+    assert mock_cache.download_gtfs.call_count == 3
+    assert mock_cache.parse_stops_for_route.call_count == 3

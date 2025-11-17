@@ -248,3 +248,39 @@ async def test_get_active_stops():
     assert stops[2]["stop_id"] == "D20N"
     assert all(stop["has_arrivals"] for stop in stops)
     assert all(stop["stop_name"] is None for stop in stops)
+
+
+@pytest.mark.asyncio
+async def test_get_stops():
+    """Test getting static stops for a route."""
+    from pathlib import Path
+    from pymta.gtfs_static import GTFSCache
+
+    # Mock GTFSCache
+    mock_cache = Mock(spec=GTFSCache)
+    mock_cache.download_gtfs = AsyncMock(return_value=Path("/fake/path.zip"))
+    mock_cache.parse_stops_for_route = Mock(return_value=[
+        {"stop_id": "D20N", "stop_name": "Atlantic Av-Barclays Ctr", "stop_sequence": 1},
+        {"stop_id": "D21N", "stop_name": "DeKalb Av", "stop_sequence": 2},
+        {"stop_id": "D22N", "stop_name": "Canal St", "stop_sequence": 3},
+    ])
+
+    # Mock session
+    mock_session = Mock()
+
+    # Test
+    feed = SubwayFeed(feed_id="N", session=mock_session, gtfs_cache=mock_cache)
+    stops = await feed.get_stops(route_id="Q")
+
+    assert len(stops) == 3
+    assert stops[0]["stop_id"] == "D20N"
+    assert stops[0]["stop_name"] == "Atlantic Av-Barclays Ctr"
+    assert stops[0]["stop_sequence"] == 1
+    assert stops[1]["stop_id"] == "D21N"
+    assert stops[1]["stop_name"] == "DeKalb Av"
+    assert stops[2]["stop_id"] == "D22N"
+    assert stops[2]["stop_name"] == "Canal St"
+
+    # Verify cache was called correctly
+    mock_cache.download_gtfs.assert_called_once()
+    mock_cache.parse_stops_for_route.assert_called_once_with(Path("/fake/path.zip"), "Q")

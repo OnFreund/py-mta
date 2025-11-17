@@ -13,6 +13,16 @@ FEED_URLS = {
     "7": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-7",
 }
 
+# MTA Static GTFS feed URLs
+STATIC_GTFS_URLS = {
+    "subway": "http://web.mta.info/developers/data/nyct/subway/google_transit.zip",
+    "bus_bronx": "http://web.mta.info/developers/data/nyct/bus/google_transit_bronx.zip",
+    "bus_brooklyn": "http://web.mta.info/developers/data/nyct/bus/google_transit_brooklyn.zip",
+    "bus_manhattan": "http://web.mta.info/developers/data/nyct/bus/google_transit_manhattan.zip",
+    "bus_queens": "http://web.mta.info/developers/data/nyct/bus/google_transit_queens.zip",
+    "bus_staten_island": "http://web.mta.info/developers/data/nyct/bus/google_transit_staten_island.zip",
+}
+
 # MTA GTFS-RT feed URLs for buses
 # Note: These require an API key as a query parameter
 BUS_FEED_URLS = {
