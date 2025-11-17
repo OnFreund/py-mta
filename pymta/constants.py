@@ -1,6 +1,6 @@
 """Constants for MTA GTFS-RT library."""
 
-# MTA GTFS-RT feed URLs
+# MTA GTFS-RT feed URLs for subway
 FEED_URLS = {
     "1": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs",
     "A": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace",
@@ -11,6 +11,14 @@ FEED_URLS = {
     "G": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g",
     "J": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz",
     "7": "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-7",
+}
+
+# MTA GTFS-RT feed URLs for buses
+# Note: These require an API key as a query parameter
+BUS_FEED_URLS = {
+    "trip_updates": "https://gtfsrt.prod.obanyc.com/tripUpdates",
+    "vehicle_positions": "https://gtfsrt.prod.obanyc.com/vehiclePositions",
+    "alerts": "https://gtfsrt.prod.obanyc.com/alerts",
 }
 
 # Mapping of subway lines to feed IDs
