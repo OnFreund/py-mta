@@ -4,13 +4,13 @@ Python library for accessing MTA (Metropolitan Transportation Authority) real-ti
 
 ## Features
 
-- Simple, clean async API for accessing MTA subway real-time arrival data
-- Support for all MTA subway lines
+- Simple, clean async API for accessing MTA real-time transit data
+- Support for all MTA subway lines and bus routes
+- Real-time bus arrivals and vehicle positions
 - Compatible with Home Assistant (aiohttp-based)
 - Optional session management - use your own aiohttp session or let the library manage it
 - Compatible with protobuf 6.x
 - Type hints for better IDE support
-- Extensible design for future bus API support
 
 ## Installation
 
@@ -20,7 +20,7 @@ pip install py-nymta
 
 ## Usage
 
-### Basic Example
+### Subway - Basic Example
 
 ```python
 import asyncio
@@ -39,6 +39,114 @@ async def main():
 
 asyncio.run(main())
 ```
+
+### Bus - Basic Example
+
+```python
+import asyncio
+from pymta import BusFeed
+
+async def main():
+    # Create a bus feed (requires MTA Bus Time API key)
+    api_key = "YOUR_MTA_BUS_TIME_API_KEY"
+
+    async with BusFeed(api_key=api_key) as feed:
+        # Get the next 3 arrivals for the M15 bus at stop 400561
+        arrivals = await feed.get_arrivals(route_id="M15", stop_id="400561")
+
+        for arrival in arrivals:
+            print(f"Route {arrival.route_id} to {arrival.destination}")
+            print(f"  Arrives at: {arrival.arrival_time}")
+            print(f"  Stop ID: {arrival.stop_id}")
+
+asyncio.run(main())
+```
+
+### Bus - Vehicle Positions
+
+```python
+import asyncio
+from pymta import BusFeed
+
+async def main():
+    api_key = "YOUR_MTA_BUS_TIME_API_KEY"
+
+    async with BusFeed(api_key=api_key) as feed:
+        # Get all vehicle positions for the M15 route
+        positions = await feed.get_vehicle_positions(route_id="M15")
+
+        for pos in positions:
+            print(f"Vehicle {pos['vehicle_id']} on route {pos['route_id']}")
+            print(f"  Location: {pos['latitude']}, {pos['longitude']}")
+            print(f"  Bearing: {pos['bearing']}")
+            print(f"  Last updated: {pos['timestamp']}")
+
+asyncio.run(main())
+```
+
+### Discovering Active Stops for a Route
+
+Both `SubwayFeed` and `BusFeed` support discovering which stops are currently active (have scheduled arrivals) for a route:
+
+```python
+import asyncio
+from pymta import SubwayFeed, BusFeed
+
+async def main():
+    # Get active subway stops for the Q train
+    async with SubwayFeed(feed_id="N") as feed:
+        stops = await feed.get_active_stops(route_id="Q")
+
+        print("Active Q train stops:")
+        for stop in stops:
+            status = "has arrivals" if stop["has_arrivals"] else "no arrivals"
+            print(f"  {stop['stop_id']}: {status}")
+
+    # Get active bus stops for the M15
+    api_key = "YOUR_MTA_BUS_TIME_API_KEY"
+    async with BusFeed(api_key=api_key) as feed:
+        stops = await feed.get_active_stops(route_id="M15")
+
+        print("\nActive M15 bus stops:")
+        for stop in stops:
+            status = "has arrivals" if stop["has_arrivals"] else "no arrivals"
+            print(f"  {stop['stop_id']}: {status}")
+
+asyncio.run(main())
+```
+
+**Note**: This returns stops from the real-time feed (currently active). For a complete list of all stops on a route, use the `get_stops()` method below.
+
+### Getting All Stops for a Route (Static GTFS)
+
+Both `SubwayFeed` and `BusFeed` support getting the complete list of stops for a route from static GTFS data. This is useful for showing dropdown menus or complete route information:
+
+```python
+import asyncio
+from pymta import SubwayFeed, BusFeed
+
+async def main():
+    # Get all subway stops for the Q train
+    async with SubwayFeed(feed_id="N") as feed:
+        stops = await feed.get_stops(route_id="Q")
+
+        print("All Q train stops:")
+        for stop in stops:
+            print(f"  {stop['stop_id']}: {stop['stop_name']} (seq: {stop['stop_sequence']})")
+
+    # Get all bus stops for the M15
+    api_key = "YOUR_MTA_BUS_TIME_API_KEY"
+    async with BusFeed(api_key=api_key) as feed:
+        stops = await feed.get_stops(route_id="M15")
+
+        print("\nAll M15 bus stops:")
+        for stop in stops:
+            print(f"  {stop['stop_id']}: {stop['stop_name']} (seq: {stop['stop_sequence']})")
+
+asyncio.run(main())
+```
+
+**Note**: Static GTFS data is cached locally for 24 hours to improve performance and reduce API calls. The first call will download the GTFS ZIP file, subsequent calls will use the cached version.
 
 ### Finding the Feed ID for a Route
 
@@ -115,6 +223,16 @@ async def main():
 asyncio.run(main())
 ```
 
+## Getting an MTA Bus Time API Key
+
+To use the bus features, you need an MTA Bus Time API key:
+
+1. Visit the [MTA Bus Time Developer Portal](https://bt.mta.info/wiki/Developers/Index)
+2. Request an API key (you will receive one within 30 minutes)
+3. Use the API key when creating a `BusFeed` instance
+
+**Note**: The subway feeds do not require an API key.
+
 ## Station IDs and Directions
 
 MTA station IDs include a direction suffix:
@@ -145,13 +263,20 @@ The MTA groups subway lines into feeds:
 | `J` | J, Z |
 | `7` | 7, 7X |
 
+## Bus Stop IDs
+
+Bus stop IDs are numeric values (e.g., `400561`, `308209`). You can find stop IDs:
+- Using the [MTA Bus Time website](https://bustime.mta.info/)
+- Through the OneBusAway API for stop discovery
+- From MTA's static GTFS feeds
+
 ## API Reference
 
 ### `SubwayFeed`
 
 Main class for accessing subway GTFS-RT feeds. Supports async context manager protocol.
 
-#### `__init__(feed_id: str, timeout: int = 30, session: Optional[aiohttp.ClientSession] = None)`
+#### `__init__(feed_id: str, timeout: int = 30, session: Optional[aiohttp.ClientSession] = None, gtfs_cache: Optional[GTFSCache] = None)`
 
 Initialize the subway feed.
 
@@ -159,6 +284,7 @@ Initialize the subway feed.
 - `feed_id`: The feed ID (e.g., '1', 'A', 'N', 'B', 'L', 'SI', 'G', 'J', '7')
 - `timeout`: Request timeout in seconds (default: 30)
 - `session`: Optional aiohttp ClientSession. If not provided, a new session will be created for each request.
+- `gtfs_cache`: Optional GTFSCache instance for static GTFS data caching. If not provided, a new cache will be created.
 
 **Raises:**
 - `ValueError`: If feed_id is not valid
@@ -174,6 +300,40 @@ Get upcoming train arrivals for a specific route and stop.
 
 **Returns:**
 - List of `Arrival` objects sorted by arrival time
+
+**Raises:**
+- `MTAFeedError`: If feed cannot be fetched or parsed
+
+#### `async get_stops(route_id: str) -> list[dict]`
+
+Get all stops for a subway route from static GTFS data.
+
+**Parameters:**
+- `route_id`: The route/line ID (e.g., '1', 'A', 'Q')
+
+**Returns:**
+- List of dictionaries containing:
+  - `stop_id`: The stop ID
+  - `stop_name`: Stop name
+  - `stop_sequence`: Order of stop on the route
+
+**Raises:**
+- `MTAFeedError`: If GTFS data cannot be fetched or parsed
+
+**Note:** Static GTFS data is cached locally for 24 hours to improve performance.
+
+#### `async get_active_stops(route_id: str) -> list[dict]`
+
+Get all active stops for a subway route from the real-time feed.
+
+**Parameters:**
+- `route_id`: The route/line ID (e.g., '1', 'A', 'Q')
+
+**Returns:**
+- List of dictionaries containing:
+  - `stop_id`: The stop ID (includes direction suffix like N/S)
+  - `stop_name`: Stop name if available (typically None in real-time feeds)
+  - `has_arrivals`: Whether there are currently arrivals at this stop
 
 **Raises:**
 - `MTAFeedError`: If feed cannot be fetched or parsed
@@ -204,6 +364,105 @@ Get the feed ID for a given route.
 
 **Raises:**
 - `ValueError`: If route_id is not valid
+
+### `BusFeed`
+
+Main class for accessing bus GTFS-RT feeds. Supports async context manager protocol.
+
+#### `__init__(api_key: str, timeout: int = 30, session: Optional[aiohttp.ClientSession] = None, gtfs_cache: Optional[GTFSCache] = None)`
+
+Initialize the bus feed.
+
+**Parameters:**
+- `api_key`: MTA Bus Time API key (get one at https://bt.mta.info/wiki/Developers/Index)
+- `timeout`: Request timeout in seconds (default: 30)
+- `session`: Optional aiohttp ClientSession. If not provided, a new session will be created for each request.
+- `gtfs_cache`: Optional GTFSCache instance for static GTFS data caching. If not provided, a new cache will be created.
+
+**Raises:**
+- `ValueError`: If api_key is not provided
+
+#### `async get_arrivals(route_id: str, stop_id: str, max_arrivals: int = 3) -> list[Arrival]`
+
+Get upcoming bus arrivals for a specific route and stop.
+
+**Parameters:**
+- `route_id`: The bus route ID (e.g., 'M15', 'B46', 'Q10')
+- `stop_id`: The stop ID (e.g., '400561', '308209')
+- `max_arrivals`: Maximum number of arrivals to return (default: 3)
+
+**Returns:**
+- List of `Arrival` objects sorted by arrival time
+
+**Raises:**
+- `MTAFeedError`: If feed cannot be fetched or parsed
+
+#### `async get_vehicle_positions(route_id: Optional[str] = None) -> list[dict]`
+
+Get current vehicle positions for buses.
+
+**Parameters:**
+- `route_id`: Optional bus route ID to filter by (e.g., 'M15', 'B46'). If None, returns all vehicles.
+
+**Returns:**
+- List of vehicle position dictionaries containing:
+  - `vehicle_id`: Vehicle identifier
+  - `route_id`: Route identifier
+  - `latitude`: Current latitude
+  - `longitude`: Current longitude
+  - `bearing`: Current bearing (0-359 degrees, or None)
+  - `timestamp`: Last update timestamp (datetime object)
+
+**Raises:**
+- `MTAFeedError`: If feed cannot be fetched or parsed
+
+#### `async get_stops(route_id: str) -> list[dict]`
+
+Get all stops for a bus route from static GTFS data.
+
+**Parameters:**
+- `route_id`: The bus route ID (e.g., 'M15', 'B46', 'Q10')
+
+**Returns:**
+- List of dictionaries containing:
+  - `stop_id`: The stop ID
+  - `stop_name`: Stop name
+  - `stop_sequence`: Order of stop on the route
+
+**Raises:**
+- `MTAFeedError`: If GTFS data cannot be fetched or parsed, or route not found
+
+**Note:** This method searches all borough GTFS feeds to find the route. Static GTFS data is cached locally for 24 hours to improve performance.
+
+#### `async get_active_stops(route_id: str) -> list[dict]`
+
+Get all active stops for a bus route from the real-time feed.
+
+**Parameters:**
+- `route_id`: The bus route ID (e.g., 'M15', 'B46', 'Q10')
+
+**Returns:**
+- List of dictionaries containing:
+  - `stop_id`: The stop ID
+  - `stop_name`: Stop name if available (typically None in real-time feeds)
+  - `has_arrivals`: Whether there are currently arrivals at this stop
+
+**Raises:**
+- `MTAFeedError`: If feed cannot be fetched or parsed
+
+#### `async close()`
+
+Close the owned session if it exists. Only needed if not using the async context manager.
+
+#### Async Context Manager
+
+The `BusFeed` class supports the async context manager protocol:
+
+```python
+async with BusFeed(api_key="YOUR_KEY") as feed:
+    arrivals = await feed.get_arrivals(route_id="M15", stop_id="400561")
+# Session is automatically closed when exiting the context
+```
 
 ### `Arrival`
 
