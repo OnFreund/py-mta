@@ -1,7 +1,7 @@
 """Tests for SubwayFeed class."""
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from google.transit import gtfs_realtime_pb2
 import pytest
@@ -35,8 +35,8 @@ def test_get_feed_id_for_invalid_route():
         SubwayFeed.get_feed_id_for_route("INVALID")
 
 
-@patch("pymta.requests.get")
-def test_get_arrivals_success(mock_get):
+@pytest.mark.asyncio
+async def test_get_arrivals_success():
     """Test getting arrivals successfully."""
     # Create a GTFS-RT FeedMessage
     feed_message = gtfs_realtime_pb2.FeedMessage()
@@ -57,14 +57,19 @@ def test_get_arrivals_success(mock_get):
     stop_time.arrival.time = int(future_time)
 
     # Mock response
-    mock_response = Mock()
-    mock_response.content = feed_message.SerializeToString()
+    mock_response = AsyncMock()
+    mock_response.read = AsyncMock(return_value=feed_message.SerializeToString())
     mock_response.raise_for_status = Mock()
-    mock_get.return_value = mock_response
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=None)
+
+    # Mock session
+    mock_session = Mock()
+    mock_session.get = Mock(return_value=mock_response)
 
     # Test
-    feed = SubwayFeed(feed_id="N")
-    arrivals = feed.get_arrivals(route_id="Q", stop_id="B08S")
+    feed = SubwayFeed(feed_id="N", session=mock_session)
+    arrivals = await feed.get_arrivals(route_id="Q", stop_id="B08S")
 
     assert len(arrivals) == 1
     assert arrivals[0].route_id == "Q"
@@ -73,8 +78,8 @@ def test_get_arrivals_success(mock_get):
     assert isinstance(arrivals[0].arrival_time, datetime)
 
 
-@patch("pymta.requests.get")
-def test_get_arrivals_filters_past_arrivals(mock_get):
+@pytest.mark.asyncio
+async def test_get_arrivals_filters_past_arrivals():
     """Test that past arrivals are filtered out."""
     # Create a GTFS-RT FeedMessage
     feed_message = gtfs_realtime_pb2.FeedMessage()
@@ -93,20 +98,25 @@ def test_get_arrivals_filters_past_arrivals(mock_get):
     stop_time.arrival.time = int(past_time)
 
     # Mock response
-    mock_response = Mock()
-    mock_response.content = feed_message.SerializeToString()
+    mock_response = AsyncMock()
+    mock_response.read = AsyncMock(return_value=feed_message.SerializeToString())
     mock_response.raise_for_status = Mock()
-    mock_get.return_value = mock_response
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=None)
+
+    # Mock session
+    mock_session = Mock()
+    mock_session.get = Mock(return_value=mock_response)
 
     # Test
-    feed = SubwayFeed(feed_id="N")
-    arrivals = feed.get_arrivals(route_id="Q", stop_id="B08S")
+    feed = SubwayFeed(feed_id="N", session=mock_session)
+    arrivals = await feed.get_arrivals(route_id="Q", stop_id="B08S")
 
     assert len(arrivals) == 0
 
 
-@patch("pymta.requests.get")
-def test_get_arrivals_max_arrivals(mock_get):
+@pytest.mark.asyncio
+async def test_get_arrivals_max_arrivals():
     """Test max_arrivals parameter."""
     # Create a GTFS-RT FeedMessage with 5 arrivals
     feed_message = gtfs_realtime_pb2.FeedMessage()
@@ -125,27 +135,39 @@ def test_get_arrivals_max_arrivals(mock_get):
         stop_time.arrival.time = int(future_time)
 
     # Mock response
-    mock_response = Mock()
-    mock_response.content = feed_message.SerializeToString()
+    mock_response = AsyncMock()
+    mock_response.read = AsyncMock(return_value=feed_message.SerializeToString())
     mock_response.raise_for_status = Mock()
-    mock_get.return_value = mock_response
+    mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_response.__aexit__ = AsyncMock(return_value=None)
+
+    # Mock session
+    mock_session = Mock()
+    mock_session.get = Mock(return_value=mock_response)
 
     # Test
-    feed = SubwayFeed(feed_id="N")
-    arrivals = feed.get_arrivals(route_id="Q", stop_id="B08S", max_arrivals=3)
+    feed = SubwayFeed(feed_id="N", session=mock_session)
+    arrivals = await feed.get_arrivals(route_id="Q", stop_id="B08S", max_arrivals=3)
 
     assert len(arrivals) == 3
 
 
-@patch("pymta.requests.get")
-def test_get_arrivals_network_error(mock_get):
+@pytest.mark.asyncio
+async def test_get_arrivals_network_error():
     """Test handling of network errors."""
-    import requests.exceptions
-    mock_get.side_effect = requests.exceptions.RequestException("Network error")
+    import aiohttp
 
-    feed = SubwayFeed(feed_id="N")
+    # Mock session that raises an error when entering context
+    mock_response = Mock()
+    mock_response.__aenter__ = AsyncMock(side_effect=aiohttp.ClientError("Network error"))
+    mock_response.__aexit__ = AsyncMock(return_value=None)
+
+    mock_session = Mock()
+    mock_session.get = Mock(return_value=mock_response)
+
+    feed = SubwayFeed(feed_id="N", session=mock_session)
     with pytest.raises(MTAFeedError, match="Error fetching GTFS-RT feed"):
-        feed.get_arrivals(route_id="Q", stop_id="B08S")
+        await feed.get_arrivals(route_id="Q", stop_id="B08S")
 
 
 def test_arrival_sorting():

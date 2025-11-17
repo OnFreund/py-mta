@@ -1,15 +1,16 @@
 """py-nymta library for accessing NYC transit real-time data."""
 
 from datetime import datetime, timezone
+from typing import Optional
 
+import aiohttp
 from google.protobuf.message import DecodeError
 from google.transit import gtfs_realtime_pb2
-import requests
 
 from .constants import FEED_URLS, LINE_TO_FEED
 from .models import Arrival
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 __all__ = ["SubwayFeed", "Arrival", "MTAError", "MTAFeedError"]
 
 
@@ -24,12 +25,19 @@ class MTAFeedError(MTAError):
 class SubwayFeed:
     """Interface for MTA subway real-time feeds."""
 
-    def __init__(self, feed_id: str, timeout: int = 30) -> None:
+    def __init__(
+        self,
+        feed_id: str,
+        timeout: int = 30,
+        session: Optional[aiohttp.ClientSession] = None,
+    ) -> None:
         """Initialize the subway feed.
 
         Args:
             feed_id: The feed ID (e.g., '1', 'A', 'N', 'B', 'L', 'SI', 'G', 'J', '7').
             timeout: Request timeout in seconds (default: 30).
+            session: Optional aiohttp ClientSession. If not provided, a new session
+                will be created for each request.
 
         Raises:
             ValueError: If feed_id is not valid.
@@ -43,8 +51,24 @@ class SubwayFeed:
         self.feed_id = feed_id
         self.feed_url = FEED_URLS[feed_id]
         self.timeout = timeout
+        self._session = session
+        self._owned_session: Optional[aiohttp.ClientSession] = None
 
-    def get_arrivals(
+    async def __aenter__(self) -> "SubwayFeed":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit."""
+        await self.close()
+
+    async def close(self) -> None:
+        """Close the owned session if it exists."""
+        if self._owned_session is not None:
+            await self._owned_session.close()
+            self._owned_session = None
+
+    async def get_arrivals(
         self,
         route_id: str,
         stop_id: str,
@@ -63,17 +87,27 @@ class SubwayFeed:
         Raises:
             MTAFeedError: If feed cannot be fetched or parsed.
         """
+        # Get or create session
+        session = self._session or self._owned_session
+        if session is None:
+            session = aiohttp.ClientSession()
+            self._owned_session = session
+
         # Fetch the GTFS-RT feed
         try:
-            response = requests.get(self.feed_url, timeout=self.timeout)
-            response.raise_for_status()
-        except requests.exceptions.RequestException as err:
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
+            async with session.get(self.feed_url, timeout=timeout) as response:
+                response.raise_for_status()
+                content = await response.read()
+        except aiohttp.ClientError as err:
             raise MTAFeedError(f"Error fetching GTFS-RT feed: {err}") from err
+        except TimeoutError as err:
+            raise MTAFeedError(f"Timeout fetching GTFS-RT feed: {err}") from err
 
         # Parse the protobuf
         feed = gtfs_realtime_pb2.FeedMessage()
         try:
-            feed.ParseFromString(response.content)
+            feed.ParseFromString(content)
         except DecodeError as err:
             raise MTAFeedError(f"Error parsing GTFS-RT feed: {err}") from err
 
