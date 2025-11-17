@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+import aiofiles
 import aiohttp
 
 
@@ -79,7 +80,8 @@ class GTFSCache:
                 content = await response.read()
 
             # Write to cache
-            cache_path.write_bytes(content)
+            async with aiofiles.open(cache_path, 'wb') as f:
+                await f.write(content)
             return cache_path
 
         finally:

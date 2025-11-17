@@ -11,7 +11,7 @@ from .constants import FEED_URLS, LINE_TO_FEED, BUS_FEED_URLS, STATIC_GTFS_URLS
 from .models import Arrival
 from .gtfs_static import GTFSCache
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = ["SubwayFeed", "BusFeed", "Arrival", "MTAError", "MTAFeedError"]
 
 
