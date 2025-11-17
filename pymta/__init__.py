@@ -10,7 +10,7 @@ from google.transit import gtfs_realtime_pb2
 from .constants import FEED_URLS, LINE_TO_FEED
 from .models import Arrival
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 __all__ = ["SubwayFeed", "Arrival", "MTAError", "MTAFeedError"]
 
 
